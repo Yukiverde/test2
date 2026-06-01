@@ -12,17 +12,17 @@
 
 body{
     margin:0;
-    background:linear-gradient(135deg,#12002e,#1a237e,#004d40);
-    color:#ffffff;
-    font-family:Verdana,sans-serif;
-    text-align:center;
     min-height:100vh;
+    background:linear-gradient(135deg,#10002b,#240046,#3c096c,#5a189a);
+    font-family:Arial,sans-serif;
+    color:white;
+    text-align:center;
 }
 
 h1{
-    margin:15px;
     color:#00ffff;
     text-shadow:0 0 15px #00ffff;
+    margin:15px 0;
 }
 
 #info{
@@ -33,24 +33,22 @@ h1{
 canvas{
     background:#050816;
     border:4px solid #00ffff;
-    box-shadow:0 0 30px #00ffff;
+    box-shadow:0 0 25px #00ffff;
 }
 
 button{
     margin-top:15px;
     padding:12px 24px;
+    font-size:16px;
     border:none;
     border-radius:10px;
+    cursor:pointer;
     background:#ff00ff;
     color:white;
-    font-size:16px;
-    cursor:pointer;
-    transition:0.2s;
 }
 
 button:hover{
     transform:scale(1.05);
-    box-shadow:0 0 15px #ff00ff;
 }
 
 #instructions{
@@ -68,14 +66,12 @@ button:hover{
 </div>
 
 <canvas id="maze"></canvas>
-
 <br>
-
-<button onclick="newMaze()">Generate New Maze</button>
+<button onclick="newMaze()">New Maze</button>
 
 <div id="instructions">
-    Move: WASD or Arrow Keys<br>
-    Reach the green goal before the purple chaser catches you!
+    WASD or Arrow Keys<br>
+    The chaser starts at your old position after your first move!
 </div>
 
 <script>
@@ -98,6 +94,8 @@ let chaseInterval;
 let player;
 let goal;
 let chaser;
+
+let firstMoveMade = false;
 
 class Cell{
     constructor(x,y){
@@ -164,6 +162,49 @@ function generateMaze(){
         }
         else{
             break;
+        }
+    }
+
+    // Create additional routes
+    for(let i=0;i<70;i++){
+
+        let x = Math.floor(Math.random()*cols);
+        let y = Math.floor(Math.random()*rows);
+
+        let cell = maze[index(x,y)];
+
+        let directions = [];
+
+        if(x > 0) directions.push("left");
+        if(x < cols-1) directions.push("right");
+        if(y > 0) directions.push("top");
+        if(y < rows-1) directions.push("bottom");
+
+        let dir =
+            directions[Math.floor(Math.random()*directions.length)];
+
+        if(dir === "left"){
+            let neighbor = maze[index(x-1,y)];
+            cell.walls.left = false;
+            neighbor.walls.right = false;
+        }
+
+        if(dir === "right"){
+            let neighbor = maze[index(x+1,y)];
+            cell.walls.right = false;
+            neighbor.walls.left = false;
+        }
+
+        if(dir === "top"){
+            let neighbor = maze[index(x,y-1)];
+            cell.walls.top = false;
+            neighbor.walls.bottom = false;
+        }
+
+        if(dir === "bottom"){
+            let neighbor = maze[index(x,y+1)];
+            cell.walls.bottom = false;
+            neighbor.walls.top = false;
         }
     }
 }
@@ -236,35 +277,37 @@ function draw(){
     }
 
     // Goal
-    ctx.fillStyle = "#00ff66";
-    ctx.shadowColor = "#00ff66";
-    ctx.shadowBlur = 20;
+    ctx.fillStyle="#00ff66";
+    ctx.shadowColor="#00ff66";
+    ctx.shadowBlur=20;
     ctx.fillRect(
-        goal.x*size+7,
-        goal.y*size+7,
-        size-14,
-        size-14
+        goal.x*size+6,
+        goal.y*size+6,
+        size-12,
+        size-12
     );
 
     // Chaser
-    ctx.beginPath();
-    ctx.fillStyle = "#ff00ff";
-    ctx.shadowColor = "#ff00ff";
-    ctx.shadowBlur = 20;
-    ctx.arc(
-        chaser.x*size+size/2,
-        chaser.y*size+size/2,
-        size/3,
-        0,
-        Math.PI*2
-    );
-    ctx.fill();
+    if(chaser){
+        ctx.beginPath();
+        ctx.fillStyle="#ff006e";
+        ctx.shadowColor="#ff006e";
+        ctx.shadowBlur=20;
+        ctx.arc(
+            chaser.x*size+size/2,
+            chaser.y*size+size/2,
+            size/3,
+            0,
+            Math.PI*2
+        );
+        ctx.fill();
+    }
 
     // Player
     ctx.beginPath();
-    ctx.fillStyle = "#ffd600";
-    ctx.shadowColor = "#ffd600";
-    ctx.shadowBlur = 20;
+    ctx.fillStyle="#ffd60a";
+    ctx.shadowColor="#ffd60a";
+    ctx.shadowBlur=20;
     ctx.arc(
         player.x*size+size/2,
         player.y*size+size/2,
@@ -281,16 +324,48 @@ function move(dx,dy){
 
     let current = maze[index(player.x,player.y)];
 
-    if(dx === 1 && !current.walls.right) player.x++;
-    if(dx === -1 && !current.walls.left) player.x--;
-    if(dy === 1 && !current.walls.bottom) player.y++;
-    if(dy === -1 && !current.walls.top) player.y--;
+    let oldX = player.x;
+    let oldY = player.y;
+
+    let moved = false;
+
+    if(dx === 1 && !current.walls.right){
+        player.x++;
+        moved = true;
+    }
+
+    if(dx === -1 && !current.walls.left){
+        player.x--;
+        moved = true;
+    }
+
+    if(dy === 1 && !current.walls.bottom){
+        player.y++;
+        moved = true;
+    }
+
+    if(dy === -1 && !current.walls.top){
+        player.y--;
+        moved = true;
+    }
+
+    if(moved && !firstMoveMade){
+
+        firstMoveMade = true;
+
+        chaser = {
+            x: oldX,
+            y: oldY
+        };
+
+        chaseInterval = setInterval(moveChaser,350);
+    }
 
     checkWin();
     draw();
 }
 
-document.addEventListener("keydown",e=>{
+document.addEventListener("keydown",(e)=>{
 
     switch(e.key.toLowerCase()){
 
@@ -318,26 +393,25 @@ document.addEventListener("keydown",e=>{
 
 function moveChaser(){
 
-    let dx = player.x - chaser.x;
-    let dy = player.y - chaser.y;
+    if(!chaser) return;
 
     let current = maze[index(chaser.x,chaser.y)];
 
-    let possible = [];
+    let options = [];
 
     if(!current.walls.right)
-        possible.push({x:1,y:0});
+        options.push({x:1,y:0});
 
     if(!current.walls.left)
-        possible.push({x:-1,y:0});
+        options.push({x:-1,y:0});
 
     if(!current.walls.bottom)
-        possible.push({x:0,y:1});
+        options.push({x:0,y:1});
 
     if(!current.walls.top)
-        possible.push({x:0,y:-1});
+        options.push({x:0,y:-1});
 
-    possible.sort((a,b)=>{
+    options.sort((a,b)=>{
 
         let da =
             Math.abs((chaser.x+a.x)-player.x) +
@@ -350,9 +424,10 @@ function moveChaser(){
         return da-db;
     });
 
-    if(possible.length > 0){
-        chaser.x += possible[0].x;
-        chaser.y += possible[0].y;
+    if(options.length){
+
+        chaser.x += options[0].x;
+        chaser.y += options[0].y;
     }
 
     if(chaser.x === player.x &&
@@ -392,6 +467,9 @@ function checkWin(){
 
 function newMaze(){
 
+    clearInterval(timerInterval);
+    clearInterval(chaseInterval);
+
     generateMaze();
 
     player = {x:0,y:0};
@@ -401,26 +479,18 @@ function newMaze(){
         y:rows-1
     };
 
-    chaser = {
-        x:Math.floor(cols/2),
-        y:Math.floor(rows/2)
-    };
+    chaser = null;
+
+    firstMoveMade = false;
 
     timer = 0;
 
     document.getElementById("timer").textContent = timer;
 
-    clearInterval(timerInterval);
-    clearInterval(chaseInterval);
-
     timerInterval = setInterval(()=>{
         timer++;
         document.getElementById("timer").textContent = timer;
     },1000);
-
-    chaseInterval = setInterval(()=>{
-        moveChaser();
-    },450);
 
     draw();
 }
